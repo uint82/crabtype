@@ -1,0 +1,11 @@
+/target
+
+
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+
+Session.vim
