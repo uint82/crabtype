@@ -13,7 +13,7 @@ Crabtype is designed to be a lightweight, keyboard-centric alternative to web-ba
 - **Multiple Test Modes**:
   - **Time**: Test against a countdown timer (15, 30, 60, 120 seconds).
   - **Words**: Type a set number of words (10, 25, 50, etc.).
-  - **Quote**: Type specific quotes from a curated database, filterable by length category or ID.
+  - **Quote**: Type specific quotes from a curated database.
 
 - **Detailed Statistics**: View WPM, raw WPM, accuracy, and character breakdowns (correct/incorrect/extra/missed) after every test run.
 
@@ -246,7 +246,7 @@ All contributions, big or small, are appreciated!
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. See the LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
