@@ -3,6 +3,7 @@ mod config;
 mod models;
 mod ui;
 pub mod utils;
+mod generator;
 
 use anyhow::Result;
 use app::App;

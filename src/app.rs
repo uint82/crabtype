@@ -1,12 +1,10 @@
 use crate::config::Theme;
 use crate::models::{
-    AppState, Mode, QuoteData, QuoteEntry, QuoteLength, QuoteSelector, WordData,
+    AppState, Mode, QuoteData, WordData,
 };
 use crate::utils::strings;
+use crate::generator::WordGenerator;
 use anyhow::{Context, Result};
-use rand::prelude::IndexedRandom;
-use rand::seq::SliceRandom;
-use rand::Rng;
 use rust_embed::RustEmbed;
 use std::time::Instant;
 use textwrap::Options;
@@ -29,6 +27,8 @@ pub struct App {
 
     pub use_numbers: bool,
     pub use_punctuation: bool,
+
+    word_generator: WordGenerator,
 
     pub input: String,
     pub cursor_idx: usize,
@@ -88,6 +88,12 @@ impl App {
 
         let quote_data: QuoteData = serde_json::from_str(q_str)?;
 
+        let word_generator = WordGenerator::new(
+            word_data.clone(),
+            use_numbers,
+            use_punctuation,
+        );
+
         let mut app = Self {
             should_quit: false,
             state: AppState::Waiting,
@@ -96,6 +102,7 @@ impl App {
             theme,
             use_numbers,
             use_punctuation,
+            word_generator,
             input: String::new(),
             cursor_idx: 0,
             start_time: None,
@@ -536,296 +543,32 @@ impl App {
         self.sync_display_text();
     }
 
-    fn generate_unique_batch(&self, count: usize, rng: &mut impl Rng) -> Vec<String> {
-        let mut final_stream: Vec<String> = Vec::with_capacity(count);
-        let mut deck = self.word_data.words.clone();
-        while final_stream.len() < count {
-            deck.shuffle(rng);
-            for (i, word_ref) in deck.iter().enumerate() {
-                if final_stream.len() >= count {
-                    break;
-                }
-                let mut word_str = word_ref.clone();
-                if let Some(last_word) = final_stream.last() {
-                    if last_word.contains(&word_str) || word_str == *last_word {
-                        if i + 1 < deck.len() {
-                            continue;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                if self.use_numbers && rng.random_bool(0.15) {
-                    final_stream.push(rng.random_range(0..=9999).to_string());
-                    continue;
-                }
-                if self.use_punctuation {
-                    if rng.random_bool(0.40) {
-                        word_str = self.apply_contraction_logic(word_str, rng);
-                    }
-                    if rng.random_bool(0.30) {
-                        let p_type = rng.random_range(0..100);
-                        match p_type {
-                            0..=39 => word_str.push(','),
-                            40..=69 => word_str.push('.'),
-                            70..=74 => word_str.push('!'),
-                            80..=89 => word_str = format!("\"{}\"", word_str),
-                            90..=94 => word_str = format!("'{}'", word_str),
-                            95..=99 => word_str = format!("({})", word_str),
-                            _ => {}
-                        }
-                    }
-                }
-                final_stream.push(word_str);
-            }
-        }
-        final_stream
-    }
-
-    fn generate_smart_word(&self, rng: &mut impl Rng) -> Vec<String> {
-        if self.use_numbers && rng.random_bool(0.15) {
-            return vec![rng.random_range(0..=9999).to_string()];
-        }
-        let mut word = if let Some(w) = self.word_data.words.choose(rng) {
-            w.clone()
-        } else {
-            "word".to_string()
-        };
-        if self.use_punctuation {
-            if rng.random_bool(0.40) {
-                word = self.apply_contraction_logic(word, rng);
-            }
-            if rng.random_bool(0.30) {
-                let p_type = rng.random_range(0..100);
-                match p_type {
-                    0..=39 => word.push(','),
-                    40..=69 => word.push('.'),
-                    70..=74 => word.push('!'),
-                    75..=79 => return vec![word, "-".to_string()],
-                    80..=89 => word = format!("\"{}\"", word),
-                    90..=94 => word = format!("'{}'", word),
-                    95..=99 => word = format!("({})", word),
-                    _ => {}
-                }
-            }
-        }
-        vec![word]
-    }
-
-    fn apply_contraction_logic(&self, original: String, rng: &mut impl Rng) -> String {
-        let lower = original.to_lowercase();
-        if let Some(replacements) = Self::get_contraction_replacements(&lower) {
-            if let Some(replacement) = replacements.choose(rng) {
-                return self.match_casing(&original, replacement);
-            }
-        }
-        original
-    }
-
-    fn get_contraction_replacements(word: &str) -> Option<&'static [&'static str]> {
-        match word {
-            "are" => Some(&["aren't"]),
-            "can" => Some(&["can't"]),
-            "could" => Some(&["couldn't"]),
-            "did" => Some(&["didn't"]),
-            "does" => Some(&["doesn't"]),
-            "do" => Some(&["don't"]),
-            "had" => Some(&["hadn't"]),
-            "has" => Some(&["hasn't"]),
-            "have" => Some(&["haven't"]),
-            "is" => Some(&["isn't"]),
-            "it" => Some(&["it's", "it'll"]),
-            "i" => Some(&["i'm", "i'll", "i've", "i'd"]),
-            "you" => Some(&["you'll", "you're", "you've", "you'd"]),
-            "that" => Some(&["that's", "that'll", "that'd"]),
-            "must" => Some(&["mustn't", "must've"]),
-            "there" => Some(&["there's", "there'll", "there'd"]),
-            "he" => Some(&["he's", "he'll", "he'd"]),
-            "she" => Some(&["she's", "she'll", "she'd"]),
-            "we" => Some(&["we're", "we'll", "we'd"]),
-            "they" => Some(&["they're", "they'll", "they'd"]),
-            "should" => Some(&["shouldn't", "should've"]),
-            "was" => Some(&["wasn't"]),
-            "were" => Some(&["weren't"]),
-            "will" => Some(&["won't"]),
-            "would" => Some(&["wouldn't", "would've"]),
-            "going" => Some(&["goin'"]),
-            _ => None,
-        }
-    }
-
-    fn match_casing(&self, original: &str, replacement: &str) -> String {
-        let is_all_upper = original
-            .chars()
-            .all(|c| !c.is_alphabetic() || c.is_uppercase());
-        if is_all_upper {
-            return replacement.to_uppercase();
-        }
-        let first_is_upper = original.chars().next().map_or(false, |c| c.is_uppercase());
-        if first_is_upper {
-            let mut c = replacement.chars();
-            match c.next() {
-                Option::None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-            }
-        } else {
-            replacement.to_string()
-        }
-    }
-
     fn generate_initial_words(&mut self) {
-        let mut rng = rand::rng();
-        self.word_stream.clear();
+        let result = self.word_generator.generate_initial_words(&self.mode, &self.quote_data);
 
-        match &self.mode {
-            Mode::Time(_) => {
-                for _ in 0..100 {
-                    let words = self.generate_smart_word(&mut rng);
-                    self.word_stream.extend(words);
-                }
-            }
-            Mode::Words(count) => {
-                let limit = (*count).min(100);
-                let words = self.generate_unique_batch(limit, &mut rng);
-                self.generated_count = words.len();
-                self.word_stream = words;
-            }
-            Mode::Quote(selector) => {
-                let q_opt = match selector {
-                    QuoteSelector::Id(target_id) => {
-                        self.quote_data.quotes.iter().find(|q| q.id == *target_id)
-                    }
-                    QuoteSelector::Category(len_category) => {
-                        let range = match len_category {
-                            QuoteLength::Short => &self.quote_data.groups[0],
-                            QuoteLength::Medium => &self.quote_data.groups[1],
-                            QuoteLength::Long => &self.quote_data.groups[2],
-                            QuoteLength::VeryLong => &self.quote_data.groups[3],
-                            QuoteLength::All => &vec![0, 9999],
-                        };
-                        let valid: Vec<&QuoteEntry> = self
-                            .quote_data
-                            .quotes
-                            .iter()
-                            .filter(|q| q.length >= range[0] && q.length <= range[1])
-                            .collect();
-                        valid.choose(&mut rng).copied()
-                    }
-                };
+        self.word_stream = result.word_stream;
+        self.quote_pool = result.quote_pool;
+        self.total_quote_words = result.total_quote_words;
+        self.current_quote_source = result.current_quote_source;
+        self.generated_count = result.generated_count;
 
-                if let Some(q) = q_opt {
-                    let clean_text = strings::clean_typography_symbols(&q.text);
-                    let all_words: Vec<String> =
-                        clean_text.split_whitespace().map(String::from).collect();
-
-                    self.total_quote_words = all_words.len();
-                    self.current_quote_source = q.source.clone();
-
-                    if all_words.len() > 100 {
-                        self.word_stream = all_words[..100].to_vec();
-                        let mut pool = all_words[100..].to_vec();
-                        pool.reverse();
-                        self.quote_pool = pool;
-                    } else {
-                        self.word_stream = all_words;
-                        self.quote_pool = Vec::new();
-                    }
-                } else {
-                    self.word_stream =
-                        vec!["No".to_string(), "Quote".to_string(), "Found".to_string()];
-                    self.total_quote_words = 3;
-                    self.quote_pool = Vec::new();
-                }
-            }
-        }
-
-        if self.use_punctuation && !matches!(self.mode, Mode::Quote(_)) {
-            self.apply_sentence_rules();
-            if let Some(last) = self.word_stream.last() {
-                if last == "-" {
-                    self.word_stream.pop();
-                }
-            }
-            if let Some(last) = self.word_stream.last_mut() {
-                if last.ends_with(',') {
-                    last.pop();
-                }
-                let c = last.chars().last().unwrap_or(' ');
-                if !['.', '!', '?'].contains(&c) {
-                    last.push('.');
-                }
-            }
-        }
         self.update_stream_string();
     }
 
     fn add_one_word(&mut self) {
-        let mut rng = rand::rng();
+        if let Some(new_words) = self.word_generator.add_one_word(
+            &self.mode,
+            &self.word_stream,
+            &mut self.quote_pool,
+            self.generated_count,
+        ) {
+            self.word_stream.extend(new_words);
 
-        match self.mode {
-            Mode::Time(_) => {
-                let mut new_words = self.generate_smart_word(&mut rng);
-                if self.use_punctuation {
-                    if let Some(first_new_word) = new_words.first_mut() {
-                        if let Some(last_word) = self.word_stream.last() {
-                            if strings::ends_with_terminator(last_word) {
-                                strings::capitalize_word(first_new_word);
-                            }
-                        }
-                    }
-                }
-                self.word_stream.extend(new_words);
-                self.update_stream_string();
+            if matches!(self.mode, Mode::Words(_)) {
+                self.generated_count += 1;
             }
-            Mode::Quote(_) => {
-                if let Some(next_word) = self.quote_pool.pop() {
-                    self.word_stream.push(next_word);
-                    self.update_stream_string();
-                }
-            }
-            Mode::Words(target) => {
-                if self.generated_count < target {
-                    let mut new_words = self.generate_smart_word(&mut rng);
 
-                    if let Some(last) = self.word_stream.last() {
-                        if let Some(first_new) = new_words.first() {
-                            if last == first_new {
-                                new_words = self.generate_smart_word(&mut rng);
-                            }
-                        }
-                    }
-
-                    if self.use_punctuation {
-                        if let Some(first_new_word) = new_words.first_mut() {
-                            if let Some(last_word) = self.word_stream.last() {
-                                if strings::ends_with_terminator(last_word) {
-                                    strings::capitalize_word(first_new_word);
-                                }
-                            }
-                        }
-                    }
-
-                    self.word_stream.extend(new_words);
-                    self.generated_count += 1;
-                    self.update_stream_string();
-                }
-            }
-        }
-    }
-
-    fn apply_sentence_rules(&mut self) {
-        if self.word_stream.is_empty() {
-            return;
-        }
-        if let Some(first) = self.word_stream.first_mut() {
-            strings::capitalize_word(first);
-        }
-        let len = self.word_stream.len();
-        for i in 0..len - 1 {
-            let should_cap = strings::ends_with_terminator(&self.word_stream[i]);
-            if should_cap {
-                strings::capitalize_word(&mut self.word_stream[i + 1]);
-            }
+            self.update_stream_string();
         }
     }
 
