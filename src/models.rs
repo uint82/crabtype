@@ -63,13 +63,15 @@ pub enum WordState {
 pub struct Word {
     pub text: String,
     pub state: WordState,
+    pub index: usize,
 }
 
 impl Word {
-    pub fn new(text: String) -> Self {
+    pub fn new(text: String, index: usize) -> Self {
         Self {
             text,
             state: WordState::Pending,
+            index,
         }
     }
 }

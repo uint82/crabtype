@@ -62,6 +62,7 @@ pub struct App {
     pub display_mask: Vec<bool>,
 
     pub word_data: WordData,
+    pub next_word_index: usize,
 }
 
 impl App {
@@ -131,6 +132,7 @@ impl App {
             total_quote_words: 0,
             word_data,
             quote_data,
+            next_word_index: 0,
         };
 
         app.restart_test();
@@ -163,6 +165,7 @@ impl App {
         self.show_ui = true;
         self.quote_pool.clear();
         self.total_quote_words = 0;
+        self.next_word_index = 0;
         self.generate_initial_words();
     }
 
@@ -353,17 +356,20 @@ impl App {
         self.total_quote_words = result.total_quote_words;
         self.current_quote_source = result.current_quote_source;
         self.generated_count = result.generated_count;
+        self.next_word_index = result.next_index;
         self.update_stream_string();
     }
 
     fn add_one_word(&mut self) {
-        if let Some(new_words) = self.word_generator.add_one_word(
+        if let Some((new_words, new_next_index)) = self.word_generator.add_one_word(
             &self.mode,
             &self.word_stream,
             &mut self.quote_pool,
             self.generated_count,
+            self.next_word_index,
         ) {
             self.word_stream.extend(new_words);
+            self.next_word_index = new_next_index;
             if matches!(self.mode, Mode::Words(_)) {
                 self.generated_count += 1;
             }
@@ -444,12 +450,44 @@ impl App {
     }
 
     fn recalculate_lines(&mut self) {
-        let layout_width = (self.terminal_width as usize * 80) / 100;
-        let safe_width = layout_width.saturating_sub(2);
-        let options = Options::new(safe_width);
-        let lines = textwrap::wrap(&self.display_string, options);
-        self.visual_lines = lines.into_iter().map(|c| c.into_owned()).collect();
+    let layout_width = (self.terminal_width as usize * 80) / 100;
+    let safe_width = layout_width.saturating_sub(2);
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0;
+
+    let words: Vec<&str> = self.display_string.split(' ').collect();
+
+    for word in words.iter() {
+        let word_len = word.chars().count();
+
+        let space_before = if current_width == 0 { 0 } else { 1 };
+        let total_needed = current_width + space_before + word_len;
+
+        if total_needed <= safe_width {
+            if current_width > 0 {
+                current_line.push(' ');
+                current_width += 1;
+            }
+            current_line.push_str(word);
+            current_width += word_len;
+        } else {
+            if !current_line.is_empty() {
+                lines.push(current_line.clone());
+            }
+            current_line.clear();
+            current_line.push_str(word);
+            current_width = word_len;
+        }
     }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    self.visual_lines = lines;
+}
 
     fn check_scroll_trigger(&mut self) {
         let mut running_char_count = 0;
@@ -509,6 +547,8 @@ impl App {
 
             if words_scrolled > 0 {
                 let drain_amount = words_scrolled.min(self.word_stream.len());
+                // note: when we drain words from word_stream, their indices stay the same
+                // the indices are stable identifiers, not array positions
                 self.word_stream.drain(0..drain_amount);
 
                 self.furthest_word_idx = self.furthest_word_idx.saturating_sub(words_scrolled);

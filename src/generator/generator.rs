@@ -16,6 +16,7 @@ pub struct GeneratedWords {
     pub total_quote_words: usize,
     pub current_quote_source: String,
     pub generated_count: usize,
+    pub next_index: usize,
 }
 
 impl WordGenerator {
@@ -67,7 +68,7 @@ impl WordGenerator {
             .into_iter()
             .enumerate()
             .map(|(i, text)| {
-                let mut w = Word::new(text);
+                let mut w = Word::new(text, i);
                 if i == 0 {
                     w.state = WordState::Active;
                 }
@@ -75,12 +76,15 @@ impl WordGenerator {
             })
             .collect();
 
+        let next_index = word_stream.len();
+
         GeneratedWords {
             word_stream,
             quote_pool,
             total_quote_words,
             current_quote_source,
             generated_count,
+            next_index,
         }
     }
 
@@ -90,7 +94,8 @@ impl WordGenerator {
         existing_stream: &[Word],
         quote_pool: &mut Vec<String>,
         generated_count: usize,
-    ) -> Option<Vec<Word>> {
+        next_index: usize,
+    ) -> Option<(Vec<Word>, usize)> {
         let mut rng = rand::rng();
 
         let context_strings: Vec<String> = existing_stream.iter().map(|w| w.text.clone()).collect();
@@ -116,7 +121,15 @@ impl WordGenerator {
         };
 
         new_raw_words.map(|strs| {
-            strs.into_iter().map(Word::new).collect()
+            let mut current_index = next_index;
+            let words: Vec<Word> = strs.into_iter().map(|text| {
+                let w = Word::new(text, current_index);
+                current_index += 1;
+                w
+            }).collect();
+
+            let new_next_index = current_index;
+            (words, new_next_index)
         })
     }
 }
