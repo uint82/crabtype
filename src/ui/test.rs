@@ -50,7 +50,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     };
 
     header_spans.push(Span::styled(
-        " crabtype",
+        "typa",
         Style::default()
             .fg(brand_color)
             .add_modifier(ratatui::style::Modifier::BOLD),
