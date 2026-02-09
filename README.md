@@ -1,10 +1,10 @@
-# crabtype
+# typa
 
-[![GitHub Stars](https://img.shields.io/github/stars/uint82/crabtype)](https://github.com/uint82/crabtype)
+[![GitHub Stars](https://img.shields.io/github/stars/uint82/typa)](https://github.com/uint82/typa)
 
 A minimal, terminal-based typing speed test written in Rust.
 
-Crabtype is designed to be a lightweight, keyboard-centric alternative to web-based typing tests. It runs entirely in your terminal with support for custom themes and multiple testing modes.
+Typa is designed to be a lightweight, keyboard-centric alternative to web-based typing tests. It runs entirely in your terminal with support for custom themes and multiple testing modes.
 
 ![Recording](./assets/demo.gif)
 
@@ -33,8 +33,8 @@ Crabtype is designed to be a lightweight, keyboard-centric alternative to web-ba
 1. **Clone Repository**
 
 ```bash
-git clone https://github.com/uint82/crabtype.git
-cd crabtype
+git clone https://github.com/uint82/typa.git
+cd typa
 ```
 
 2. **Build the project**
@@ -46,7 +46,7 @@ cargo build --release
 3. **Run the binary**
 
 ```bash
-./target/release/crabtype
+./target/release/typa
 ```
 
 ### Install with Cargo
@@ -54,8 +54,8 @@ cargo build --release
 1. **Clone Repository**
 
 ```bash
-git clone https://github.com/uint82/crabtype.git
-cd crabtype
+git clone https://github.com/uint82/typa.git
+cd typa
 ```
 
 2. **Install to cargo**
@@ -69,23 +69,23 @@ cargo install --path .
 To start the default test (Time mode, 60 seconds, English):
 
 ```bash
-crabtype
+typa
 ```
 
 For usage instructions, run:
 
 ```bash
-crabtype --help
+typa --help
 ```
 
 ### Command-Line Options
 
 ```
-crabtype 0.1.0
+typa 0.1.0
 
 A rusty terminal typing test
 
-Usage: crabtype [OPTIONS]
+Usage: typa [OPTIONS]
 
 Options:
   -t, --time <TIME>          Time mode: Custom duration in seconds (e.g. 15, 60, 120, 3600)
@@ -104,25 +104,25 @@ Flags:
 
 ```bash
 # Run a 60 second test
-crabtype -t 60
+typa -t 60
 
 # Run a 50 word test
-crabtype -w 50
+typa -w 50
 
 # Run a short quote test
-crabtype -q short
+typa -q short
 
 # Run a 30 second test with punctuation and numbers
-crabtype -t 30 -p -n
+typa -t 30 -p -n
 
 # Run a 100 word test in Indonesian with punctuation
-crabtype -w 100 -l indonesian -p
+typa -w 100 -l indonesian -p
 
 # Run a specific quote by ID
-crabtype -q 42
+typa -q 42
 
 # Run a very long quote test
-crabtype -q verylong
+typa -q verylong
 ```
 
 ## Keyboard Shortcuts
@@ -134,15 +134,15 @@ During a test:
 
 ## Configuration
 
-Crabtype supports custom color themes via a TOML configuration file.
+Typa supports custom color themes via a TOML configuration file.
 
 ### Configuration File Location
 
 The configuration file should be named `config.toml` and placed in:
 
-- **Linux**: `~/.config/crabtype/config.toml`
-- **macOS**: `$HOME/Library/Application Support/crabtype/config.toml`
-- **Windows**: `C:\Users\user\AppData\Roaming\crabtype\config.toml`
+- **Linux**: `~/.config/typa/config.toml`
+- **macOS**: `$HOME/Library/Application Support/typa/config.toml`
+- **Windows**: `C:\Users\user\AppData\Roaming\typa\config.toml`
 
 **Note**: If the configuration directory doesn't exist, you'll need to create it manually before adding your `config.toml` file.
 
@@ -189,7 +189,7 @@ You can also select a specific quote by its ID number if you know it.
 
 ## Language Support
 
-Crabtype includes word lists and quote collections for multiple languages. The default is English, but you can specify others using the `-l` flag.
+Typa includes word lists and quote collections for multiple languages. The default is English, but you can specify others using the `-l` flag.
 
 Currently supported languages:
 
@@ -236,7 +236,7 @@ chore: update dependencies
 
 ### Reporting Issues
 
-Found a bug or have a feature request? Please [open an issue](https://github.com/uint82/crabtype/issues) on GitHub with:
+Found a bug or have a feature request? Please [open an issue](https://github.com/uint82/typa/issues) on GitHub with:
 
 - A clear description of the problem or suggestion
 - Steps to reproduce (for bugs)
