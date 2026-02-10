@@ -21,3 +21,15 @@ pub fn format_timer(seconds: u64) -> String {
         format!("{}", seconds)
     }
 }
+
+pub fn get_quote_length_category(char_count: usize) -> &'static str {
+    if char_count <= 100 {
+        "short"
+    } else if char_count <= 300 {
+        "medium"
+    } else if char_count <= 600 {
+        "long"
+    } else {
+        "very long"
+    }
+}

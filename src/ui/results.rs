@@ -1,6 +1,6 @@
 use crate::app::App;
 use crate::models::{Mode, QuoteSelector};
-use crate::ui::utils::hex_to_rgb;
+use crate::ui::utils::{hex_to_rgb, get_quote_length_category};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::Style,
@@ -135,8 +135,19 @@ pub fn draw(f: &mut Frame, app: &App) {
         Mode::Time(t) => format!("time {}", t),
         Mode::Words(w) => format!("word {}", w),
         Mode::Quote(q) => match q {
-            QuoteSelector::Id(_) => "quote".to_string(),
-            QuoteSelector::Category(len) => format!("quote {:?}", len).to_lowercase(),
+            QuoteSelector::Id(_) => {
+                let actual_length = get_quote_length_category(app.original_quote_length);
+                format!("quote {}", actual_length)
+            },
+            QuoteSelector::Category(len) => {
+                let len_str = format!("{:?}", len).to_lowercase();
+                let actual_length = if len_str == "all" {
+                    get_quote_length_category(app.original_quote_length)
+                } else {
+                    &len_str
+                };
+                format!("quote {}", actual_length)
+            },
         },
     };
     let mut type_parts = vec![mode_str, app.word_data.name.clone()];

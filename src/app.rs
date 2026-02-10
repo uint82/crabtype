@@ -22,6 +22,7 @@ pub struct App {
     pub quote_data: QuoteData,
     pub quote_pool: Vec<String>,
     pub total_quote_words: usize,
+    pub original_quote_length: usize,
 
     pub theme: Theme,
 
@@ -130,6 +131,7 @@ impl App {
             visual_lines: Vec::new(),
             quote_pool: Vec::new(),
             total_quote_words: 0,
+            original_quote_length: 0,
             word_data,
             quote_data,
             next_word_index: 0,
@@ -165,6 +167,7 @@ impl App {
         self.show_ui = true;
         self.quote_pool.clear();
         self.total_quote_words = 0;
+        self.original_quote_length = 0;
         self.next_word_index = 0;
         self.generate_initial_words();
     }
@@ -358,6 +361,10 @@ impl App {
         self.generated_count = result.generated_count;
         self.next_word_index = result.next_index;
         self.update_stream_string();
+
+        if matches!(self.mode, Mode::Quote(_)) {
+            self.original_quote_length = self.word_stream_string.chars().count();
+        }
     }
 
     fn add_one_word(&mut self) {
