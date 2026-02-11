@@ -47,6 +47,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Length(2),
             Constraint::Length(2),
             Constraint::Length(2),
+            Constraint::Length(2),
             Constraint::Fill(1),
             Constraint::Length(1),
         ])
@@ -73,7 +74,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     let stats_line = Line::from(vec![
         Span::styled("acc: ", Style::default().fg(sub_color)),
         Span::styled(
-            format!("{:.0}%", app.final_accuracy),
+            format!("{:.2}%", app.final_accuracy),
             Style::default().fg(main_color),
         ),
         Span::styled(" | raw: ", Style::default().fg(sub_color)),
@@ -88,38 +89,23 @@ pub fn draw(f: &mut Frame, app: &App) {
         inner_layout[1],
     );
 
-    let mut total_correct = app.st_correct;
-    let mut total_incorrect = app.st_incorrect;
-    let mut total_extra = app.st_extra;
-    let mut total_missed = app.st_missed;
+    let (_, _, vis_raw_cor, vis_raw_inc, vis_raw_ext, vis_raw_mis) =
+        app.calculate_custom_stats_for_slice(&app.input, &app.display_string, &app.display_mask);
 
-    for (i, c) in app.input.chars().enumerate() {
-        if i < app.display_mask.len() {
-            let is_extra = app.display_mask[i];
-            if is_extra {
-                total_extra += 1;
-            } else {
-                let target = app.display_string.chars().nth(i).unwrap_or(' ');
-                if c == '\0' {
-                    total_missed += 1;
-                } else if c == target {
-                    total_correct += 1;
-                } else {
-                    total_incorrect += 1;
-                }
-            }
-        }
-    }
+    let total_raw_cor = app.st_correct + vis_raw_cor;
+    let total_raw_inc = app.st_incorrect + vis_raw_inc;
+    let total_raw_ext = app.st_extra + vis_raw_ext;
+    let total_raw_mis = app.st_missed + vis_raw_mis;
 
     let chars_line = Line::from(vec![
         Span::styled("cor: ", Style::default().fg(sub_color)),
-        Span::styled(format!("{}", total_correct), Style::default().fg(main_color)),
+        Span::styled(format!("{}", total_raw_cor), Style::default().fg(main_color)),
         Span::styled(" | inc: ", Style::default().fg(sub_color)),
-        Span::styled(format!("{}", total_incorrect), Style::default().fg(main_color)),
+        Span::styled(format!("{}", total_raw_inc), Style::default().fg(main_color)),
         Span::styled(" | ext: ", Style::default().fg(sub_color)),
-        Span::styled(format!("{}", total_extra), Style::default().fg(main_color)),
+        Span::styled(format!("{}", total_raw_ext), Style::default().fg(main_color)),
         Span::styled(" | mis: ", Style::default().fg(sub_color)),
-        Span::styled(format!("{}", total_missed), Style::default().fg(main_color)),
+        Span::styled(format!("{}", total_raw_mis), Style::default().fg(main_color)),
         Span::styled(" | time: ", Style::default().fg(sub_color)),
         Span::styled(
             format!("{:.1}s", app.final_time),
@@ -130,6 +116,28 @@ pub fn draw(f: &mut Frame, app: &App) {
     f.render_widget(
         Paragraph::new(chars_line).alignment(Alignment::Center),
         inner_layout[2],
+    );
+
+    let total_keystrokes = app.live_correct_keystrokes + app.live_incorrect_keystrokes;
+    let debug_line = Line::from(vec![
+        Span::styled("Accuracy: (", Style::default().fg(sub_color)),
+        Span::styled("correct = ", Style::default().fg(sub_color)),
+        Span::styled(format!("{}", app.live_correct_keystrokes), Style::default().fg(main_color)),
+        Span::styled(", incorrect = ", Style::default().fg(sub_color)),
+        Span::styled(format!("{}", app.live_incorrect_keystrokes), Style::default().fg(main_color)),
+        Span::styled(", total = ", Style::default().fg(sub_color)),
+        Span::styled(format!("{}", total_keystrokes), Style::default().fg(main_color)),
+        Span::styled(")", Style::default().fg(sub_color)),
+        Span::styled(" = ", Style::default().fg(sub_color)),
+        Span::styled(
+            format!("{:.2}%", app.final_accuracy),
+            Style::default().fg(main_color),
+        ),
+    ]);
+
+    f.render_widget(
+        Paragraph::new(debug_line).alignment(Alignment::Center),
+        inner_layout[3],
     );
 
     let mode_str = match &app.mode {
@@ -168,7 +176,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     f.render_widget(
         Paragraph::new(type_line).alignment(Alignment::Center),
-        inner_layout[3],
+        inner_layout[4],
     );
 
     if !app.current_quote_source.is_empty() {
@@ -179,7 +187,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
         f.render_widget(
             Paragraph::new(source_line).alignment(Alignment::Center),
-            inner_layout[5],
+            inner_layout[6],
         );
     }
 

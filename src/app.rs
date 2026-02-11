@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use rust_embed::RustEmbed;
 use std::time::Instant;
 use textwrap::Options;
+use std::collections::HashSet;
 
 #[derive(RustEmbed)]
 #[folder = "resources/"]
@@ -37,6 +38,8 @@ pub struct App {
 
     pub gross_char_count: usize,
     pub total_errors_ever: usize,
+    pub processed_word_errors: HashSet<usize>,
+
     pub generated_count: usize,
     pub scrolled_word_count: usize,
 
@@ -46,7 +49,14 @@ pub struct App {
     pub st_incorrect: usize,
     pub st_extra: usize,
     pub st_missed: usize,
+
+    pub acc_score_correct: isize,
+    pub acc_score_incorrect: isize,
+
     pub uncorrected_errors_scrolled: usize,
+
+    pub live_correct_keystrokes: usize,
+    pub live_incorrect_keystrokes: usize,
 
     pub final_wpm: f64,
     pub final_raw_wpm: f64,
@@ -110,6 +120,7 @@ impl App {
             start_time: None,
             gross_char_count: 0,
             total_errors_ever: 0,
+            processed_word_errors: HashSet::new(),
             generated_count: 0,
             scrolled_word_count: 0,
             furthest_word_idx: 0,
@@ -117,7 +128,11 @@ impl App {
             st_incorrect: 0,
             st_extra: 0,
             st_missed: 0,
+            acc_score_correct: 0,
+            acc_score_incorrect: 0,
             uncorrected_errors_scrolled: 0,
+            live_correct_keystrokes: 0,
+            live_incorrect_keystrokes: 0,
             final_wpm: 0.0,
             final_raw_wpm: 0.0,
             final_accuracy: 0.0,
@@ -155,6 +170,7 @@ impl App {
         self.state = AppState::Waiting;
         self.gross_char_count = 0;
         self.total_errors_ever = 0;
+        self.processed_word_errors.clear();
         self.generated_count = 0;
         self.scrolled_word_count = 0;
         self.furthest_word_idx = 0;
@@ -162,7 +178,11 @@ impl App {
         self.st_incorrect = 0;
         self.st_extra = 0;
         self.st_missed = 0;
+        self.acc_score_correct = 0;
+        self.acc_score_incorrect = 0;
         self.uncorrected_errors_scrolled = 0;
+        self.live_correct_keystrokes = 0;
+        self.live_incorrect_keystrokes = 0;
         self.current_quote_source.clear();
         self.show_ui = true;
         self.quote_pool.clear();
@@ -209,10 +229,12 @@ impl App {
         let error_rate = total_uncorrected as f64 / duration_min;
         self.final_wpm = (gross_wpm - error_rate).max(0.0);
 
-        if self.gross_char_count > 0 {
-            let correct = self.gross_char_count.saturating_sub(self.total_errors_ever);
-            self.final_accuracy = (correct as f64 / self.gross_char_count as f64) * 100.0;
-        } else { self.final_accuracy = 0.0; }
+        let total_keystrokes = self.live_correct_keystrokes + self.live_incorrect_keystrokes;
+        if total_keystrokes > 0 {
+            self.final_accuracy = (self.live_correct_keystrokes as f64 / total_keystrokes as f64) * 100.0;
+        } else {
+            self.final_accuracy = 0.0;
+        }
 
         self.final_time = duration_secs;
         self.show_ui = true;
@@ -241,36 +263,81 @@ impl App {
             if c != ' ' {
                 if self.will_cause_visual_wrap(c) { return; }
             }
+        }
+
+        self.show_ui = false;
+        self.gross_char_count += 1;
+
+        let is_keystroke_correct = if word_idx < self.word_stream.len() {
+            let target_word = &self.word_stream[word_idx].text;
+            let user_current_word = current_input_segments.last().unwrap_or(&"");
+
+            if c == ' ' {
+                user_current_word == target_word
+            } else {
+                if user_current_word.len() < target_word.len() {
+                    let target_char = target_word.chars().nth(user_current_word.len()).unwrap_or('\0');
+                    strings::are_characters_visually_equal(c, target_char)
+                } else {
+                    false
+                }
+            }
+        } else {
+            false
+        };
+
+        if is_keystroke_correct {
+            self.live_correct_keystrokes += 1;
+        } else {
+            self.live_incorrect_keystrokes += 1;
+        }
+
+        if !is_keystroke_correct {
+            self.total_errors_ever += 1;
+        } else {
+            self.total_errors_ever += 1;
+        }
+
+        if word_idx < self.word_stream.len() {
+            let target_word_struct = &self.word_stream[word_idx];
+            let target_word = &target_word_struct.text;
+            let user_current_word = current_input_segments.last().unwrap_or(&"");
 
             if c == ' ' {
                 if user_current_word.is_empty() { return; }
+
+                let mut is_word_error = false;
+                let mut extra_len_penalty = 0;
+
+                if user_current_word != target_word {
+                    is_word_error = true;
+                }
+
+                if user_current_word.len() > target_word.len() {
+                    extra_len_penalty = user_current_word.len() - target_word.len();
+                }
+
+                if !self.processed_word_errors.contains(&word_idx) {
+                    if is_word_error || extra_len_penalty > 0 {
+                        let word_penalty = if is_word_error { 1 } else { 0 };
+                        self.total_errors_ever += word_penalty + extra_len_penalty;
+                        self.processed_word_errors.insert(word_idx);
+                    }
+                }
 
                 if user_current_word.len() < target_word.len() {
                     let missing_count = target_word.len() - user_current_word.len();
                     for _ in 0..missing_count {
                         self.input.push('\0');
-                        self.total_errors_ever += 1;
                         self.cursor_idx += 1;
                     }
                 }
             }
         }
 
-        self.show_ui = false;
-        self.gross_char_count += 1;
-
-        let target_chars: Vec<char> = self.word_stream_string.chars().collect();
-        if self.cursor_idx < target_chars.len() {
-            let target_char = target_chars[self.cursor_idx];
-            if !strings::are_characters_visually_equal(c, target_char) {
-                self.total_errors_ever += 1;
-            }
-        } else {
-            self.total_errors_ever += 1;
-        }
-
         self.input.push(c);
         self.cursor_idx += 1;
+
         self.sync_display_text();
 
         if c == ' ' {
@@ -280,8 +347,26 @@ impl App {
 
         match self.mode {
             Mode::Words(_) | Mode::Quote(_) => {
-                if self.input.len() >= self.word_stream_string.len() {
-                    self.end_test();
+                let extra_count = self.display_mask.iter().filter(|&&is_extra| is_extra).count();
+                let effective_len = self.input.len().saturating_sub(extra_count);
+
+                if effective_len >= self.word_stream_string.len() {
+                    let target_words: Vec<&str> = self.word_stream_string.split(' ').collect();
+                    let input_words: Vec<&str> = self.input.split(' ').collect();
+
+                    if let Some(last_target_word) = target_words.last() {
+                        let last_word_index = target_words.len() - 1;
+                        let last_input_word = input_words.get(last_word_index).unwrap_or(&"");
+
+                        let cleaned_input: String = last_input_word
+                            .chars()
+                            .filter(|&c| c != '\0')
+                            .collect();
+
+                        if &cleaned_input == last_target_word {
+                            self.end_test();
+                        }
+                    }
                 }
             }
             _ => {}
@@ -337,7 +422,6 @@ impl App {
             self.word_stream[next_idx].state = WordState::Active;
         }
 
-        // prevent backspace/space toggle from inflating generated_count
         if finished_idx >= self.furthest_word_idx {
             self.furthest_word_idx = finished_idx + 1;
 
@@ -524,28 +608,22 @@ impl App {
             }
         }
 
-        let input_chars: Vec<char> = self.input.chars().take(chars_to_remove_visual).collect();
-        for i in 0..chars_to_remove_visual {
-            if i < input_chars.len() && i < self.display_mask.len() {
-                let is_extra = self.display_mask[i];
-                if is_extra {
-                    self.st_extra += 1;
-                    self.uncorrected_errors_scrolled += 1;
-                } else {
-                    let typed = input_chars[i];
-                    let target = self.display_string.chars().nth(i).unwrap_or(' ');
-                    if typed == '\0' {
-                        self.st_missed += 1;
-                        self.uncorrected_errors_scrolled += 1;
-                    } else if typed == target {
-                        self.st_correct += 1;
-                    } else {
-                        self.st_incorrect += 1;
-                        self.uncorrected_errors_scrolled += 1;
-                    }
-                }
-            }
-        }
+        let input_chunk: String = self.input.chars().take(chars_to_remove_visual).collect();
+        let display_chunk: String = self.display_string.chars().take(chars_to_remove_visual).collect();
+        let mask_chunk: Vec<bool> = self.display_mask.iter().take(chars_to_remove_visual).cloned().collect();
+
+        let (acc_cor, acc_inc, raw_cor, raw_inc, raw_ext, raw_mis) =
+            self.calculate_custom_stats_for_slice(&input_chunk, &display_chunk, &mask_chunk);
+
+        self.st_correct += raw_cor;
+        self.st_incorrect += raw_inc;
+        self.st_extra += raw_ext;
+        self.st_missed += raw_mis;
+
+        self.acc_score_correct = (self.acc_score_correct + acc_cor).max(0);
+        self.acc_score_incorrect = (self.acc_score_incorrect + acc_inc).max(0);
+
+        self.uncorrected_errors_scrolled += raw_inc + raw_mis + raw_ext;
 
         if self.input.len() >= chars_to_remove_visual {
             let chunk_being_removed = &self.input[..chars_to_remove_visual];
@@ -554,10 +632,7 @@ impl App {
 
             if words_scrolled > 0 {
                 let drain_amount = words_scrolled.min(self.word_stream.len());
-                // note: when we drain words from word_stream, their indices stay the same
-                // the indices are stable identifiers, not array positions
                 self.word_stream.drain(0..drain_amount);
-
                 self.furthest_word_idx = self.furthest_word_idx.saturating_sub(words_scrolled);
             }
         }
@@ -583,5 +658,87 @@ impl App {
             self.input.drain(0..chars_to_remove_visual);
         }
         self.sync_display_text();
+    }
+
+    pub fn calculate_custom_stats_for_slice(&self, input_str: &str, display_str: &str, mask: &[bool])
+        -> (isize, isize, usize, usize, usize, usize)
+    {
+        let mut acc_correct_score: isize = 0;
+        for &m in mask { if !m { acc_correct_score += 1; } }
+        let mut acc_incorrect_score: isize = 0;
+
+        let mut raw_cor = 0;
+        let mut raw_inc = 0;
+        let mut raw_ext = 0;
+        let mut raw_mis = 0;
+
+        let input_chars: Vec<char> = input_str.chars().collect();
+        let display_chars: Vec<char> = display_str.chars().collect();
+
+        let mut i = 0;
+        while i < display_chars.len() {
+            let mut word_end = i;
+            while word_end < display_chars.len() {
+                let is_extra = if word_end < mask.len() { mask[word_end] } else { false };
+                if !is_extra && display_chars[word_end] == ' ' { break; }
+                word_end += 1;
+            }
+
+            let mut word_has_error = false;
+
+            for k in i..word_end {
+                let is_extra = if k < mask.len() { mask[k] } else { false };
+                let target_char = display_chars[k];
+                let input_char = input_chars.get(k).copied().unwrap_or('\0');
+
+                if is_extra {
+                    word_has_error = true;
+                } else {
+                    if input_char == '\0' {
+                        word_has_error = true;
+                    } else if input_char != target_char {
+                        word_has_error = true;
+                    }
+                }
+            }
+
+            for k in i..word_end {
+                let is_extra = if k < mask.len() { mask[k] } else { false };
+                let target_char = display_chars[k];
+                let input_char = input_chars.get(k).copied().unwrap_or('\0');
+
+                if is_extra {
+                    acc_incorrect_score += 1;
+                    raw_ext += 1;
+                } else {
+                    if input_char == '\0' {
+                        acc_correct_score -= 1;
+                        raw_mis += 1;
+                    } else if input_char != target_char {
+                        acc_correct_score -= 1;
+                        acc_incorrect_score += 1;
+                        raw_inc += 1;
+                    } else {
+                        if !word_has_error {
+                            raw_cor += 1;
+                        }
+                    }
+                }
+            }
+
+            if word_end < display_chars.len() {
+                if word_has_error {
+                    acc_correct_score -= 1;
+                    acc_incorrect_score += 1;
+                } else {
+                    raw_cor += 1;
+                }
+                i = word_end + 1;
+            } else {
+                i = word_end;
+            }
+        }
+
+        (acc_correct_score, acc_incorrect_score, raw_cor, raw_inc, raw_ext, raw_mis)
     }
 }
