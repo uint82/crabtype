@@ -1,0 +1,70 @@
+name: Release Typa
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-amd64
+            binary_extension: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows-amd64
+            binary_extension: ".exe"
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: macos-amd64
+            binary_extension: ""
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Binary (Release Mode)
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          BIN_NAME="typa"
+          TARGET_DIR="target/${{ matrix.target }}/release"
+          ASSET_NAME="${BIN_NAME}-${{ matrix.suffix }}"
+
+          mkdir -p staging
+          cp "${TARGET_DIR}/${BIN_NAME}${{ matrix.binary_extension }}" "staging/${BIN_NAME}${{ matrix.binary_extension }}"
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cd staging && 7z a "../${ASSET_NAME}.zip" *
+            echo "ASSET_PATH=${ASSET_NAME}.zip" >> $GITHUB_ENV
+          else
+            strip "staging/${BIN_NAME}"
+            cd staging && tar -czf "../${ASSET_NAME}.tar.gz" *
+            echo "ASSET_PATH=${ASSET_NAME}.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET_PATH }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
