@@ -19,26 +19,27 @@ fn now_unix() -> i64 {
 }
 
 fn mode_label(mode: &Mode, use_punctuation: bool, use_numbers: bool, quote_length: &str, quote_source: &str, language: &str) -> String {
-    let base = match mode {
-        Mode::Time(t)  => format_with_mods(format!("Time {}s", t), use_punctuation, use_numbers),
-        Mode::Words(w) => format_with_mods(format!("Words {}", w), use_punctuation, use_numbers),
+    match mode {
+        Mode::Time(t)  => format_with_mods(format!("Time {}s", t), language, use_punctuation, use_numbers),
+        Mode::Words(w) => format_with_mods(format!("Words {}", w), language, use_punctuation, use_numbers),
         Mode::Quote(_) => {
             let base = if quote_length.is_empty() {
                 "Quote".to_string()
             } else {
                 format!("Quote {}", quote_length)
             };
-            if quote_source.is_empty() { base } else { format!("{} · {}", base, quote_source) }
+            let with_source = if quote_source.is_empty() { base } else { format!("{} · {}", base, quote_source) };
+            if language.is_empty() { with_source } else { format!("{} {}", with_source, language) }
         }
-    };
-    if language.is_empty() { base } else { format!("{} {}", base, language) }
+    }
 }
 
-fn format_with_mods(base: String, use_punctuation: bool, use_numbers: bool) -> String {
-    let mut mods: Vec<&str> = vec![];
-    if use_punctuation { mods.push("punct"); }
-    if use_numbers     { mods.push("num");   }
-    if mods.is_empty() { base } else { format!("{} · {}", base, mods.join(" ")) }
+fn format_with_mods(base: String, language: &str, use_punctuation: bool, use_numbers: bool) -> String {
+    let mut parts: Vec<String> = vec![base];
+    if !language.is_empty() { parts.push(language.to_string()); }
+    if use_punctuation      { parts.push("punc".to_string()); }
+    if use_numbers          { parts.push("num".to_string()); }
+    parts.join(" ")
 }
 
 impl DiscordPresence {
@@ -56,10 +57,12 @@ impl DiscordPresence {
         self.connected
     }
 
-    fn set_activity_with_retry(&mut self, act: activity::Activity<'_>) {
+    fn set_activity_with_retry(&mut self, act: activity::Activity<'_>, force: bool) {
         if !self.connected { return; }
-        if let Some(last) = self.last_activity_call {
-            if last.elapsed().as_millis() < 1000 { return; }
+        if !force {
+            if let Some(last) = self.last_activity_call {
+                if last.elapsed().as_millis() < 1000 { return; }
+            }
         }
         self.last_activity_call = Some(Instant::now());
         if self.client.set_activity(act.clone()).is_err() {
@@ -85,7 +88,7 @@ impl DiscordPresence {
                 .buttons(vec![
                     activity::Button::new("GitHub", GITHUB_URL),
                 ])
-        );
+        , false);
     }
 
     pub fn set_typing(&mut self, mode: &Mode, use_punctuation: bool, use_numbers: bool, quote_length: &str, language: &str) {
@@ -104,7 +107,7 @@ impl DiscordPresence {
                 .buttons(vec![
                     activity::Button::new("GitHub", GITHUB_URL),
                 ])
-        );
+        , false);
     }
 
     pub fn set_stats(&mut self, best_wpm: f64, total_tests: usize, current_streak: usize) {
@@ -129,7 +132,7 @@ impl DiscordPresence {
                 .buttons(vec![
                     activity::Button::new("GitHub", GITHUB_URL),
                 ])
-        );
+        , false);
     }
 
     pub fn set_result(
@@ -149,22 +152,9 @@ impl DiscordPresence {
     ) {
         let details = format!("{:.0} WPM | {:.1}% acc | {:.0}% con", wpm, accuracy, consistency);
 
-        let mode_str = match mode {
-            Mode::Time(t)  => format_with_mods(format!("Time {}s", t), use_punctuation, use_numbers),
-            Mode::Words(w) => format_with_mods(format!("Words {}", w), use_punctuation, use_numbers),
-            Mode::Quote(_) => {
-                let base = if quote_length.is_empty() { "Quote".to_string() } else { format!("Quote {}", quote_length) };
-                let with_lang = if language.is_empty() { base } else { format!("{} {}", base, language) };
-                if quote_source.is_empty() { with_lang } else { format!("{} · {}", with_lang, quote_source) }
-            }
-        };
+        let mode_str = mode_label(mode, use_punctuation, use_numbers, quote_length, quote_source, language);
 
-        let mode_str = match mode {
-            Mode::Quote(_) => mode_str,
-            _ => if language.is_empty() { mode_str } else { format!("{} {}", mode_str, language) },
-        };
-
-        let state = if is_new_best { format!("🏆 New best!  {}", mode_str) } else { mode_str };
+        let state = if is_new_best { format!("New best!  {}", mode_str) } else { mode_str };
 
         self.set_activity_with_retry(
             activity::Activity::new()
@@ -181,7 +171,7 @@ impl DiscordPresence {
                 .buttons(vec![
                     activity::Button::new("GitHub", GITHUB_URL),
                 ])
-        );
+        , false);
     }
 
 }
