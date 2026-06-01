@@ -28,8 +28,9 @@ fn mode_label(mode: &Mode, use_punctuation: bool, use_numbers: bool, quote_lengt
             } else {
                 format!("Quote {}", quote_length)
             };
-            let with_source = if quote_source.is_empty() { base } else { format!("{} · {}", base, quote_source) };
-            if language.is_empty() { with_source } else { format!("{} {}", with_source, language) }
+            let with_lang   = if language.is_empty()     { base }      else { format!("{} {}", base, language) };
+            let with_source = if quote_source.is_empty() { with_lang } else { format!("{} · {}", with_lang, quote_source) };
+            with_source
         }
     }
 }
