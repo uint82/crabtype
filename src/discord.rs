@@ -111,12 +111,12 @@ impl DiscordPresence {
     }
 
     pub fn set_stats(&mut self, best_wpm: f64, total_tests: usize, current_streak: usize) {
-        let details = format!("{:.0} WPM best | {} tests", best_wpm, total_tests);
-        let state = if current_streak > 0 {
+        let details = if current_streak > 0 {
             format!("In stats | {} day streak", current_streak)
         } else {
             "Browsing stats".to_string()
         };
+        let state = format!("{:.0} WPM best | {} tests", best_wpm, total_tests);
         self.set_activity_with_retry(
             activity::Activity::new()
                 .details(&details)
