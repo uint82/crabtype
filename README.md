@@ -18,7 +18,8 @@ Typa is designed to be a lightweight, keyboard-centric alternative to web-based 
 - **Detailed Statistics**: View WPM, raw WPM, accuracy, and character breakdowns (correct/incorrect/extra/missed) after every test run.
 
 - **Customization**:
-  - Full color theme support via TOML configuration file.
+  - Built-in color themes selectable by name.
+  - Full custom color theme support via TOML configuration file.
   - Toggle punctuation and numbers independently.
   - Multiple language support (English and Indonesian).
 
@@ -82,7 +83,7 @@ Options:
   -t, --time <TIME>          Time mode: Custom duration in seconds (e.g. 15, 60, 120, 3600)
   -w, --words <WORDS>        Words mode: Word count (1 to 10000)
   -q, --quote <QUOTE>        Quote mode: "short", "medium", "long", "very_long", "all", or a specific ID (e.g. 25)
-  -l, --language <LANGUAGE>  Language: Filename to use (e.g. "english", "indonesian") [default: english]
+  -l, --language <LANGUAGE>  Language: Filename to use (e.g. "english", "indonesian_1k") [default: english]
 
 Flags:
   -n, --numbers        Include numbers in the test
@@ -109,7 +110,10 @@ typa -q short
 typa -t 30 -p -n
 
 # Run a 100 word test in Indonesian with punctuation
-typa -w 100 -l indonesian -p
+typa -w 100 -l indonesian_1k -p
+
+# Run a quote test in Indonesian
+typa -q short -l indonesian
 
 # Run a specific quote by ID
 typa -q 42
@@ -127,7 +131,7 @@ During a test:
 
 ## Configuration
 
-Typa supports custom color themes via a TOML configuration file.
+Typa supports color themes via a TOML configuration file, either by selecting a built-in theme by name or defining your own custom colors.
 
 ### Configuration File Location
 
@@ -139,20 +143,38 @@ The configuration file should be named `config.toml` and placed in:
 
 **Note**: If the configuration directory doesn't exist, you'll need to create it manually before adding your `config.toml` file.
 
-### Example Configuration
+### Built-in Themes
+
+Select a built-in theme by name:
 
 ```toml
-[theme]
+theme = "gruvbox"
+```
+
+Available built-in themes:
+
+| Name            | Description                  |
+|-----------------|------------------------------|
+| `default`       | Gruvbox dark                 |
+| `gruvbox_dark`  | Gruvbox dark                 |
+| `gruvbox_light` | Gruvbox light                |
+
+### Custom Theme
+
+To define your own colors, add a `[custom_theme]` section. This takes priority over the `theme` setting above.
+
+```toml
+[custom_theme]
 bg = "#2c2e34"          # Background color
 main = "#e2b714"        # Brand color (timer, active stats, highlights)
 caret = "#e2b714"       # Cursor block color
 text = "#d1d0c5"        # Correctly typed text
 sub = "#646669"         # Untyped text, UI labels, footer instructions
-sub_alt = "#45474d"     # UI borders, subtle elements
+subAlt = "#45474d"      # UI borders, subtle elements
 error = "#ca4754"       # Incorrect / extra characters
 ```
 
-All colors should be specified in hexadecimal format. If the configuration file is not found, default colors will be used.
+All colors should be specified in hexadecimal format. If no configuration is found, the `default` theme is used.
 
 ## Statistics Explanation
 
@@ -184,12 +206,19 @@ You can also select a specific quote by its ID number if you know it.
 
 Typa includes word lists and quote collections for multiple languages. The default is English, but you can specify others using the `-l` flag.
 
+Word lists and quote collections are independent. A word list (used in time and word modes) and a quote collection (used in quote mode) do not need to match — only the relevant file is loaded depending on the mode:
+
+- **Time / Words mode** loads `language/{name}.json`
+- **Quote mode** loads `quotes/{name}.json`
+
+This means you can use a specific word list like `indonesian_1k` in word mode without needing a matching quote file to exist.
+
 Currently supported languages:
 
-- English (`english`)
-- Indonesian (`indonesian`)
-
-Language files are embedded in the binary and include both word lists for generating tests and curated quotes for quote mode.
+| Language   | Word list        | Quotes       |
+|------------|------------------|--------------|
+| English    | `english`        | `english`    |
+| Indonesian | `indonesian_1k`  | `indonesian` |
 
 ## Contributing
 
@@ -226,7 +255,6 @@ chore: update dependencies
 - Additional theme presets
 - Performance optimizations
 - Bug fixes and testing
-- Adding test history
 
 ### Reporting Issues
 
