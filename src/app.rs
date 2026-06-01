@@ -20,7 +20,7 @@ pub struct SessionConfig {
     pub use_numbers: bool,
     pub use_punctuation: bool,
     pub word_data: WordData,
-    pub quote_data: QuoteData,
+    pub quote_data: Option<QuoteData>,
     pub(crate) word_generator: WordGenerator,
 }
 
@@ -171,19 +171,19 @@ impl App {
     ) -> Result<Self> {
         let word_filename = format!("language/{}.json", language);
         let word_file = Asset::get(&word_filename).context(format!(
-            "Could not find embedded language file: {}",
-            word_filename
+            "Could not find embedded language file: {}", word_filename
         ))?;
-        let w_str = std::str::from_utf8(word_file.data.as_ref())?;
-        let word_data: WordData = serde_json::from_str(w_str)?;
+        let word_data: WordData = serde_json::from_str(std::str::from_utf8(word_file.data.as_ref())?)?;
 
-        let quote_filename = format!("quotes/{}.json", language);
-        let quote_file = Asset::get(&quote_filename).context(format!(
-            "Could not find embedded quotes file: {}",
-            quote_filename
-        ))?;
-        let q_str = std::str::from_utf8(quote_file.data.as_ref())?;
-        let quote_data: QuoteData = serde_json::from_str(q_str)?;
+        let quote_data: Option<QuoteData> = if matches!(mode, Mode::Quote(_)) {
+            let quote_filename = format!("quotes/{}.json", language);
+            let quote_file = Asset::get(&quote_filename).context(format!(
+                "Could not find embedded quotes file: {}", quote_filename
+            ))?;
+            Some(serde_json::from_str(std::str::from_utf8(quote_file.data.as_ref())?)?)
+        } else {
+            None
+        };
 
         let word_generator = WordGenerator::new(
             word_data.clone(),
@@ -758,7 +758,7 @@ impl App {
     fn generate_initial_words(&mut self) {
         let result = self.config.word_generator.generate_initial_words(
             &self.config.mode,
-            &self.config.quote_data,
+            self.config.quote_data.as_ref(),
         );
         self.test.word_stream          = result.word_stream;
         self.test.quote_pool           = result.quote_pool;

@@ -33,7 +33,7 @@ impl WordGenerator {
     pub fn generate_initial_words(
         &self,
         mode: &Mode,
-        quote_data: &QuoteData,
+        quote_data: Option<&QuoteData>,
     ) -> GeneratedWords {
         let mut rng = rand::rng();
 
@@ -51,7 +51,7 @@ impl WordGenerator {
                 stream
             }
             Mode::Quote(selector) => {
-                let result = quote_controller::generate(&self.source, selector, quote_data, &mut rng);
+                let result = quote_controller::generate(&self.source, selector, quote_data.expect("QuoteData must exist in quote mode"), &mut rng);
                 quote_pool = result.quote_pool;
                 total_quote_words = result.total_words;
                 current_quote_source = result.source_text;
