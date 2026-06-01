@@ -1,18 +1,24 @@
 use anyhow::Result;
 use config::{Config, File};
 use directories::ProjectDirs;
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 
+#[derive(RustEmbed)]
+#[folder = "resources/themes/"]
+struct ThemeAsset;
+
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // allow dead code for sub alt, right now i don't have button yet so i save this for the future
 pub struct Theme {
-    pub bg: String,      // background
-    pub main: String,    // brand color (timer, active highlights)
-    pub caret: String,   // cursor block color
-    pub text: String,    // correct text
-    pub sub: String,     // untyped / future text / unactive
+    pub bg: String,
+    pub main: String,
+    pub caret: String,
+    pub text: String,
+    pub sub: String,
     #[serde(alias = "subAlt")]
-    pub sub_alt: String, // subtle UI elements (footer, borders)
-    pub error: String,   // incorrect / extra text
+    pub sub_alt: String,
+    pub error: String,
 }
 
 impl Default for Theme {
@@ -31,36 +37,44 @@ impl Default for Theme {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
-    pub theme: Theme,
+    #[serde(default = "default_theme_name")]
+    pub theme: String,
+    pub custom_theme: Option<Theme>,
+}
+
+fn default_theme_name() -> String {
+    "default".to_string()
 }
 
 impl AppConfig {
     pub fn load() -> Result<Self> {
-        let defaults = Theme::default();
-
         let mut builder = Config::builder()
-            .set_default("theme.bg", defaults.bg)?
-            .set_default("theme.main", defaults.main)?
-            .set_default("theme.caret", defaults.caret)?
-            .set_default("theme.text", defaults.text)?
-            .set_default("theme.sub", defaults.sub)?
-            .set_default("theme.subAlt", defaults.sub_alt)?
-            .set_default("theme.error", defaults.error)?;
+            .set_default("theme", "default")?;
 
         if let Some(proj_dirs) = ProjectDirs::from("", "", "typa") {
-            let config_dir = proj_dirs.config_dir();
-            let config_path = config_dir.join("config.toml");
-
+            let config_path = proj_dirs.config_dir().join("config.toml");
             if config_path.exists() {
                 builder = builder.add_source(File::from(config_path));
             }
         }
 
         let cfg = builder.build()?;
-
-        // map "subAlt"  to "sub_alt"
         let app_config: AppConfig = cfg.try_deserialize()?;
-
         Ok(app_config)
     }
+
+    pub fn resolved_theme(&self) -> Theme {
+        // prioritize custom theme
+        if let Some(ref t) = self.custom_theme {
+            return t.clone();
+        }
+        get_builtin_theme(&self.theme).unwrap_or_default()
+    }
+}
+
+pub fn get_builtin_theme(name: &str) -> Option<Theme> {
+    let filename = format!("{}.json", name);
+    let file = ThemeAsset::get(&filename)?;
+    let s = std::str::from_utf8(file.data.as_ref()).ok()?;
+    serde_json::from_str(s).ok()
 }

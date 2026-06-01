@@ -92,7 +92,8 @@ fn main() -> Result<()> {
             e
         );
         AppConfig {
-            theme: config::Theme::default(),
+            theme: "default".to_string(),
+            custom_theme: None,
         }
     });
 
@@ -125,7 +126,7 @@ fn main() -> Result<()> {
                 dp.set_stats(best_wpm, total_tests, current_streak);
             }
         }
-        history::run(app_config.theme)?;
+        history::run(app_config.resolved_theme())?;
         return Ok(());
     }
 
@@ -162,7 +163,7 @@ fn main() -> Result<()> {
         cli.language,
         cli.numbers,
         cli.punctuation,
-        app_config.theme,
+        app_config.resolved_theme(),
     )?;
 
     let res = run_app(&mut terminal, &mut app);
