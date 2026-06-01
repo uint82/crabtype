@@ -1,0 +1,9 @@
+{
+  "bg": "#282828",
+  "main": "#fabd2f",
+  "caret": "#fabd2f",
+  "text": "#ebdbb2",
+  "sub": "#928374",
+  "subAlt": "#3c3836",
+  "error": "#fb4934"
+}
