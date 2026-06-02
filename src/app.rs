@@ -169,11 +169,15 @@ impl App {
         use_punctuation: bool,
         theme: Theme,
     ) -> Result<Self> {
-        let word_filename = format!("language/{}.json", language);
-        let word_file = Asset::get(&word_filename).context(format!(
-            "Could not find embedded language file: {}", word_filename
-        ))?;
-        let word_data: WordData = serde_json::from_str(std::str::from_utf8(word_file.data.as_ref())?)?;
+        let word_data: WordData = if !matches!(mode, Mode::Quote(_)) {
+            let word_filename = format!("language/{}.json", language);
+            let word_file = Asset::get(&word_filename).context(format!(
+                "Could not find embedded language file: {}", word_filename
+            ))?;
+            serde_json::from_str(std::str::from_utf8(word_file.data.as_ref())?)?
+        } else {
+            WordData { name: language.clone(), words: Vec::new() }
+        };
 
         let quote_data: Option<QuoteData> = if matches!(mode, Mode::Quote(_)) {
             let quote_filename = format!("quotes/{}.json", language);
