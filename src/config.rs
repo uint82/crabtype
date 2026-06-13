@@ -1,5 +1,4 @@
 use anyhow::Result;
-use config::{Config, File};
 use directories::ProjectDirs;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
@@ -42,25 +41,33 @@ pub struct AppConfig {
     pub custom_theme: Option<Theme>,
 }
 
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            theme: default_theme_name(),
+            custom_theme: None,
+        }
+    }
+}
+
 fn default_theme_name() -> String {
     "default".to_string()
 }
 
 impl AppConfig {
     pub fn load() -> Result<Self> {
-        let mut builder = Config::builder()
-            .set_default("theme", "default")?;
+        let Some(proj_dirs) = ProjectDirs::from("", "", "typa") else {
+            return Ok(AppConfig::default());
+        };
 
-        if let Some(proj_dirs) = ProjectDirs::from("", "", "typa") {
-            let config_path = proj_dirs.config_dir().join("config.toml");
-            if config_path.exists() {
-                builder = builder.add_source(File::from(config_path));
-            }
+        let config_path = proj_dirs.config_dir().join("config.toml");
+        if !config_path.exists() {
+            return Ok(AppConfig::default());
         }
 
-        let cfg = builder.build()?;
-        let app_config: AppConfig = cfg.try_deserialize()?;
-        Ok(app_config)
+        let raw = std::fs::read_to_string(&config_path)?;
+        let cfg: AppConfig = toml::from_str(&raw)?;
+        Ok(cfg)
     }
 
     pub fn resolved_theme(&self) -> Theme {
