@@ -9,7 +9,7 @@ repository = "https://github.com/uint82/typa.git"
 homepage = "https://github.com/uint82/typa"
 authors = ["Hilmi Abroor <abroorhilmi@gmail.com>"]
 keywords = ["typing", "cli", "game", "terminal"]
-include = ["src/**/*", "resources/**/*", "README.md", "LICENSE"]
+include = ["src/**/*", "resources/**/*", "README.md", "LICENSE", "!src/app/absorb_test.rs", "!src/appsefesf.rs"]
 
 [dependencies]
 anyhow = "1.0.100"
