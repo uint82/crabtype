@@ -7,4 +7,7 @@ pub mod scroll;
 pub mod stats;
 pub mod scoring;
 
+#[cfg(test)]
+mod absorb_test;
+
 pub use state::App;

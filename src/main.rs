@@ -230,13 +230,17 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                         let results_locked = app.test.state == models::AppState::Finished
                             && finish_time.map_or(true, |t| t.elapsed() < RESULTS_LOCKOUT);
 
+                        let is_code = app.config.word_data.name.starts_with("code_");
+
                         needs_redraw = true;
                         match key.code {
                             KeyCode::Esc => app.quit(),
                             KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                                 app.quit()
                             }
+                            KeyCode::Tab if is_code => app.on_tab(),
                             KeyCode::Tab => { finish_time = None; app.restart_test(); }
+                            KeyCode::Enter if is_code => app.on_enter(),
                             KeyCode::Char('r') if app.test.state == models::AppState::Finished && !results_locked => { finish_time = None; app.retry_last_test(); }
                             KeyCode::Char(_) | KeyCode::Backspace if results_locked => { needs_redraw = false; }
                             KeyCode::Char(c) => app.on_key(c),

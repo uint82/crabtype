@@ -124,16 +124,22 @@ impl App {
 
     pub(crate) fn seed_from_word_list(&mut self, words: Vec<String>) {
         let total = words.len();
-        let word_stream: Vec<Word> = words.iter().enumerate().map(|(i, text)| {
+        let cap   = 100.min(total);
+
+        let word_stream: Vec<Word> = words[..cap].iter().enumerate().map(|(i, text)| {
             let mut w = Word::new(text.clone(), i);
             if i == 0 { w.state = WordState::Active; }
             w
         }).collect();
 
-        self.test.word_stream      = word_stream;
-        self.test.generated_count  = total;
-        self.test.next_word_index  = total;
+        let mut overflow: Vec<String> = words[cap..].to_vec();
+        overflow.reverse();
+
+        self.test.word_stream     = word_stream;
+        self.test.generated_count = total;
+        self.test.next_word_index = cap;
         self.test.cumulative_words = words;
+        self.test.overflow_pool    = overflow;
 
         if matches!(self.config.mode, Mode::Quote(_)) {
             self.test.total_quote_words = total;

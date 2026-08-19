@@ -4,6 +4,33 @@ use crate::generator::WordGenerator;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum SlotKind {
+    Regular,
+    Space,
+    Newline,
+    Tab,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum SlotState {
+    Pending,
+    Correct,
+    Wrong(char),
+    Uncommitted(char),
+    Extra(char),
+    Missed,
+}
+
+#[derive(Clone, Debug)]
+pub struct CharSlot {
+    pub expected: char,
+    pub kind: SlotKind,
+    pub group_id: usize,
+    pub visual_width: u8,
+    pub state: SlotState,
+}
+
 pub struct SessionConfig {
     pub mode: Mode,
     pub theme: Theme,
@@ -16,6 +43,8 @@ pub struct SessionConfig {
 
 pub struct TestState {
     pub state: AppState,
+
+    pub slots: Vec<CharSlot>,
 
     pub input: String,
     pub cursor_idx: usize,
@@ -55,26 +84,26 @@ pub struct TestState {
 
     pub visual_lines: Vec<String>,
     pub display_string: String,
-    pub display_mask: Vec<bool>,
+    pub display_mask: Vec<u8>,
+    pub display_breaks: Vec<bool>,
     pub extra_char_count: usize,
 
     pub missed_chars: HashMap<usize, usize>,
-    /// The renderer uses this instead of self.input so missed positions render correctly.
     pub aligned_input: Vec<char>,
 
     pub quote_pool: Vec<String>,
     pub total_quote_words: usize,
+    pub total_code_words: usize,
+    pub code_words_scrolled: usize,
     pub original_quote_length: usize,
     pub next_word_index: usize,
 
     pub is_new_best: bool,
 
-    /// reset on every new test so the blink phase always starts visible.
     pub caret_epoch: Instant,
 
-    // append-only record of every word ever in the stream, including scrolled-off ones.
-    // word_stream_string is trimmed on scroll so it can't be used for retry.
     pub cumulative_words: Vec<String>,
+    pub overflow_pool: Vec<String>,
 
     pub wpm_history: Vec<(f64, f64)>,
     pub raw_wpm_history: Vec<(f64, f64)>,
@@ -89,6 +118,7 @@ pub struct TestState {
 impl Default for TestState {
     fn default() -> Self {
         Self {
+            slots: Vec::new(),
             state: AppState::Waiting,
             input: String::new(),
             cursor_idx: 0,
@@ -119,16 +149,20 @@ impl Default for TestState {
             visual_lines: Vec::new(),
             display_string: String::new(),
             display_mask: Vec::new(),
+            display_breaks: Vec::new(),
             extra_char_count: 0,
             missed_chars: HashMap::new(),
             aligned_input: Vec::new(),
             quote_pool: Vec::new(),
             total_quote_words: 0,
+            total_code_words: 0,
+            code_words_scrolled: 0,
             original_quote_length: 0,
             next_word_index: 0,
             is_new_best: false,
             caret_epoch: Instant::now(),
             cumulative_words: Vec::new(),
+            overflow_pool: Vec::new(),
             wpm_history: Vec::new(),
             raw_wpm_history: Vec::new(),
             errors_history: Vec::new(),
@@ -150,3 +184,4 @@ pub struct App {
     pub test: TestState,
     pub discord: Option<crate::discord::DiscordPresence>,
 }
+

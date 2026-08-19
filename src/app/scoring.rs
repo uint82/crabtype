@@ -1,4 +1,4 @@
-use super::state::App;
+use super::state::{App, SlotState};
 use crate::models::{AppState, Mode};
 use crate::history;
 
@@ -29,7 +29,9 @@ impl App {
 
         let total_correct_chars = self.test.st_correct + self.calculate_live_correct_chars();
 
-        self.test.final_raw_wpm = (self.test.gross_char_count as f64 / 5.0) * (60.0 / duration_secs);
+        let (cor, inc, ext, _) = self.resolved_char_stats();
+        let raw_chars = (cor + inc + ext) as f64;
+        self.test.final_raw_wpm = (raw_chars / 5.0) * (60.0 / duration_secs);
         self.test.final_wpm    = (total_correct_chars as f64 / 5.0) * (60.0 / duration_secs);
 
         let total_keystrokes = self.test.live_correct_keystrokes + self.test.live_incorrect_keystrokes;
@@ -50,7 +52,7 @@ impl App {
         let remaining = duration_secs - last_full_second;
 
         if remaining >= 0.495 {
-            self.push_snapshot(duration_secs);
+            self.push_snapshot(duration_secs, remaining);
         }
 
         self.test.final_consistency = self.calculate_consistency();
@@ -97,17 +99,24 @@ impl App {
             if current_second >= 1 &&
                (self.test.last_snapshot_second == u64::MAX || current_second > self.test.last_snapshot_second)
             {
+                let interval = if self.test.last_snapshot_second == u64::MAX {
+                    current_second as f64
+                } else {
+                    current_second as f64 - self.test.last_snapshot_second as f64
+                };
                 self.test.last_snapshot_second = current_second;
-                self.push_snapshot(current_second as f64);
+                self.push_snapshot(current_second as f64, interval);
             }
         }
     }
 
-    pub(crate) fn push_snapshot(&mut self, elapsed_secs: f64) {
-        if elapsed_secs <= 0.0 { return; }
+    pub(crate) fn push_snapshot(&mut self, elapsed_secs: f64, interval_secs: f64) {
+        if elapsed_secs <= 0.0 || interval_secs <= 0.0 { return; }
 
+        let (cor, inc, ext, _) = self.resolved_char_stats();
         let total_correct_chars = self.test.st_correct + self.calculate_live_correct_chars();
-        let raw_wpm = (self.test.gross_char_count as f64 / 5.0) * (60.0 / elapsed_secs);
+        let raw_chars = (cor + inc + ext) as f64;
+        let raw_wpm = (raw_chars / 5.0) * (60.0 / elapsed_secs);
         let net_wpm = (total_correct_chars as f64 / 5.0) * (60.0 / elapsed_secs);
 
         let errors_this_second = self.test.live_incorrect_keystrokes
@@ -117,7 +126,7 @@ impl App {
         let burst_chars = self.test.gross_char_count
             .saturating_sub(self.test.prev_gross_char_count);
         self.test.prev_gross_char_count = self.test.gross_char_count;
-        let burst_wpm = (burst_chars as f64 / 5.0) * 60.0;
+        let burst_wpm = ((burst_chars as f64 / 5.0) * (60.0 / interval_secs)).round();
         self.test.burst_wpm_history.push(burst_wpm);
 
         self.test.wpm_history.push((elapsed_secs, net_wpm));
@@ -128,20 +137,19 @@ impl App {
     pub(crate) fn check_test_completion(&mut self) {
         match self.config.mode {
             Mode::Words(_) | Mode::Quote(_) => {
-                // subtract extras only. aligned_input includes \0 slots for missed chars
-                let effective_len = self.test.aligned_input.len()
-                    .saturating_sub(self.test.extra_char_count);
-                if effective_len < self.test.word_stream_string.chars().count() { return; }
+                let is_code = self.config.word_data.name.starts_with("code_");
 
-                let target_words: Vec<&str> = self.test.word_stream_string.split(' ').collect();
-                let input_words:  Vec<&str> = self.test.input.split(' ').collect();
+                let all_done = if is_code {
+                    !self.test.slots.iter().any(|s| {
+                        s.state == SlotState::Pending
+                            && !matches!(s.kind, super::state::SlotKind::Newline)
+                    })
+                } else {
+                    !self.test.slots.iter().any(|s| s.state == SlotState::Pending)
+                };
 
-                if let Some(last_target_word) = target_words.last() {
-                    let last_word_index = target_words.len() - 1;
-                    let last_input_word = input_words.get(last_word_index).unwrap_or(&"");
-                    if last_input_word == last_target_word {
-                        self.end_test();
-                    }
+                if all_done {
+                    self.end_test();
                 }
             }
             _ => {}
@@ -180,17 +188,16 @@ impl App {
     }
 
     pub(crate) fn calculate_consistency(&self) -> f64 {
-        let wpms: Vec<f64> = self.test.burst_wpm_history.iter()
-            .copied()
-            .filter(|&w| w > 0.0)
-            .collect();
-        let n = wpms.len();
-        if n < 2 { return 100.0; }
-        let mean = wpms.iter().sum::<f64>() / n as f64;
-        if mean == 0.0 { return 100.0; }
-        let variance = wpms.iter().map(|w| (w - mean).powi(2)).sum::<f64>() / n as f64;
-        let std_dev = variance.sqrt();
-        let cv = std_dev / mean;
-        (1.0 - cv).clamp(0.0, 1.0) * 100.0
+        let bursts: Vec<f64> = self.test.burst_wpm_history.to_vec();
+        let n = bursts.len();
+        if n == 0 { return 0.0; }
+        let mean = bursts.iter().sum::<f64>() / n as f64;
+        if mean == 0.0 { return 0.0; }
+        let variance = bursts.iter().map(|b| (b - mean).powi(2)).sum::<f64>() / n as f64;
+        let cov = variance.sqrt() / mean;
+        let k = cov + cov.powi(3) / 3.0 + cov.powi(5) / 5.0;
+        let consistency = 100.0 * (1.0 - k.tanh());
+        if consistency.is_nan() { return 0.0; }
+        (consistency * 100.0).round() / 100.0
     }
 }
