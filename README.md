@@ -14,6 +14,7 @@ Typa is designed to be a lightweight, keyboard-centric alternative to web-based 
   - **Time**: Test against a countdown timer (15, 30, 60, 120 seconds).
   - **Words**: Type a set number of words (10, 25, 50, etc.).
   - **Quote**: Type specific quotes from a curated database.
+  - **Code**: Type code snippets with monkeytype-parity behavior (auto-indent, line breaks, tab handling).
 
 - **Detailed Statistics**: View WPM, raw WPM, accuracy, and character breakdowns (correct/incorrect/extra/missed) after every test run.
 
@@ -21,7 +22,7 @@ Typa is designed to be a lightweight, keyboard-centric alternative to web-based 
   - Built-in color themes selectable by name.
   - Full custom color theme support via TOML configuration file.
   - Toggle punctuation and numbers independently.
-  - Multiple language support (English and Indonesian).
+  - Multiple language support (English, Indonesian, Dutch, Malay, French, German, Portuguese, and Spanish).
 
 - **Responsive UI**:
   - Clean, distraction-free interface.
@@ -73,7 +74,7 @@ typa --help
 ### Command-Line Options
 
 ```
-typa 0.4.0
+typa 0.5.0
 
 A rusty terminal typing test
 
@@ -83,7 +84,7 @@ Options:
   -t, --time <TIME>          Time mode: Custom duration in seconds (e.g. 15, 60, 120, 3600)
   -w, --words <WORDS>        Words mode: Word count (1 to 10000)
   -q, --quote <QUOTE>        Quote mode: "short", "medium", "long", "very_long", "all", or a specific ID (e.g. 25)
-  -l, --language <LANGUAGE>  Language: Filename to use (e.g. "english", "indonesian_1k") [default: english]
+  -l, --language <LANGUAGE>  Language: Filename to use (e.g. "english", "indonesian") [default: english]
 
 Flags:
   -n, --numbers        Include numbers in the test
@@ -120,13 +121,17 @@ typa -q 42
 
 # Run a very long quote test
 typa -q verylong
+
+# Run a code snippet test
+typa -q code_python -l code_python
 ```
 
 ## Keyboard Shortcuts
 
 During a test:
 
-- **Tab**: Restart the current test
+- **Tab**: Restart the current test (in code mode, types a tab character instead)
+- **Enter**: Advance past line breaks (code mode only)
 - **Esc** or **Ctrl+Q**: Quit the application
 
 ## Configuration
@@ -202,6 +207,14 @@ Quote mode allows you to type passages from a curated collection. Quotes are cat
 
 You can also select a specific quote by its ID number if you know it.
 
+## Code Mode
+
+Quote collections named `code_*` (e.g. `code_python`) enable code typing mode. The snippet keeps its line breaks and indentation, and typing behaves like a code editor on Monkeytype:
+
+- **Enter** commits the current line break (auto-indent types the indentation for you on a clean line).
+- **Tab** only types tab slots; on a manually typed line you press it once per indentation level.
+- Wrong characters absorb into the expected glyph (stays red until committed), matching Monkeytype's error handling.
+
 ## Language Support
 
 Typa includes word lists and quote collections for multiple languages. The default is English, but you can specify others using the `-l` flag.
@@ -215,10 +228,17 @@ This means you can use a specific word list like `indonesian_1k` in word mode wi
 
 Currently supported languages:
 
-| Language   | Word list        | Quotes       |
-|------------|------------------|--------------|
-| English    | `english`        | `english`    |
-| Indonesian | `indonesian_1k`  | `indonesian` |
+| Language   | Word list       | Quotes       |
+|------------|-----------------|--------------|
+| English    | `english`       | `english`    |
+| Indonesian | `indonesian_1k` | `indonesian` |
+| Dutch      | `dutch_1k`      | `dutch`      |
+| Malay      | `malay_1k`      | -            |
+| French     | `french_1k`     | `french`     |
+| German     | `german_1k`     | `german`     |
+| Portuguese | `portuguese_1k` | `portuguese` |
+| Spanish    | `spanish_1k`    | `spanish`    |
+| Python code | `code_python`  | `code_python` |
 
 ## Contributing
 
