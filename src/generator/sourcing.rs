@@ -55,7 +55,17 @@ impl TextSource {
 
         if let Some(q) = q_opt {
             let clean_text = strings::clean_typography_symbols(&q.text);
-            let all_words: Vec<String> = clean_text.split_whitespace().map(String::from).collect();
+
+            // TODO: refactor quote loading into per-language word splitting.
+            // code_ languages must keep their \n and \t intact, so the whole
+            // snippet stays a single entry and rebuild_slots_from_stream sees
+            // the raw text with its control chars.
+            let all_words: Vec<String> = if self.word_data.name.starts_with("code_") {
+                vec![clean_text]
+            } else {
+                clean_text.split_whitespace().map(String::from).collect()
+            };
+
             Some((all_words, q.source.clone()))
         } else {
             None

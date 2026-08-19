@@ -9,3 +9,10 @@
 
 
 Session.vim
+
+# logs
+debug.log
+
+# stray scratch file
+src/appsefesf.rs
+src/app/absorb_test.rs
